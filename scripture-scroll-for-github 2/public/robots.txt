@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+
+# If you deploy a SEPARATE private instance of this app for yourself,
+# replace this file in that deployment with:
+#
+# User-agent: *
+# Disallow: /
+#
+# ...and preferably put real access control in front of it (see README:
+# "Keeping a private instance for yourself") rather than relying on robots.txt
+# alone, since robots.txt is only a polite request, not a security measure.

@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+  overscroll-behavior-y: contain;
+}
+
+body {
+  @apply bg-ink text-parchment font-body antialiased;
+}
+
+/* Hide scrollbar but keep snap-scroll functional */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.glass-panel {
+  background: linear-gradient(180deg, rgba(11, 15, 26, 0) 0%, rgba(11, 15, 26, 0.55) 28%, rgba(11, 15, 26, 0.86) 100%);
+  backdrop-filter: blur(2px);
+}
+
+.hairline-gold {
+  border-top: 1px solid rgba(201, 164, 76, 0.55);
+}
