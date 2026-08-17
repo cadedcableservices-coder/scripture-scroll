@@ -1,21 +1,26 @@
 const PEXELS_KEY = import.meta.env.VITE_PEXELS_API_KEY;
 
-// Search terms tuned for calm, loopable, "oddly satisfying" ambient footage —
-// legally reusable stock clips that fill the same role as the brainrot
-// background videos, without touching anyone else's copyrighted footage.
+// High-energy / motion queries. Pexels is a stock library (no copyrighted
+// game footage), so this targets the most kinetic, movement-heavy clips it
+// actually has: FPV drone chases, downhill/skate/surf POV, city speed,
+// light streaks, etc. Fills the "something moving fast behind the text" role.
 const QUERIES = [
-  "oddly satisfying",
-  "kinetic sand cutting",
-  "soap cutting asmr",
-  "slow motion water",
-  "abstract fluid paint",
-  "calm ocean waves",
-  "rain window slow motion",
-  "candle flame close up"
+  "fpv drone racing",
+  "downhill mountain bike pov",
+  "first person parkour",
+  "skateboarding pov",
+  "surfing wave pov",
+  "car driving fast night",
+  "motorcycle ride pov",
+  "snowboarding first person",
+  "running through city",
+  "neon light speed tunnel",
+  "highway timelapse night",
+  "waterfall drone flythrough"
 ];
 
-// Local fallback clips — drop your own MP4s (recorded footage, downloaded
-// Coverr/Pixabay clips, etc.) into /public/videos and list them here.
+// Local fallback clips — drop your own MP4s (recorded footage you own,
+// downloaded Coverr/Pixabay clips) into /public/videos and list them here.
 const LOCAL_FALLBACKS = [
   "/videos/fallback-1.mp4",
   "/videos/fallback-2.mp4",
@@ -36,18 +41,28 @@ export async function fetchRandomVideo() {
   }
 
   try {
+    // per_page=30 for a bigger pool → more variety; portrait for full-bleed.
     const res = await fetch(
       `https://api.pexels.com/videos/search?query=${encodeURIComponent(
         query
-      )}&per_page=15&orientation=portrait`,
+      )}&per_page=30&orientation=portrait&size=medium`,
       { headers: { Authorization: PEXELS_KEY } }
     );
     if (!res.ok) throw new Error(`Pexels request failed: ${res.status}`);
     const data = await res.json();
+
     const links = (data.videos || [])
-      .map((v) => v.video_files.find((f) => f.quality === "sd") || v.video_files[0])
-      .filter(Boolean)
-      .map((f) => f.link);
+      .map((v) => {
+        const files = v.video_files || [];
+        // Prefer a true portrait HD file; fall back to any hd, then sd, then first.
+        const portraitHd = files.find(
+          (f) => f.height > f.width && (f.quality === "hd" || f.quality === "uhd")
+        );
+        const anyHd = files.find((f) => f.quality === "hd");
+        const sd = files.find((f) => f.quality === "sd");
+        return (portraitHd || anyHd || sd || files[0])?.link;
+      })
+      .filter(Boolean);
 
     if (links.length === 0) return randomFrom(LOCAL_FALLBACKS);
 
