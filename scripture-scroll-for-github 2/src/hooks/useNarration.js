@@ -2,9 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Wraps the browser's built-in speech synthesis so verse text can be read
- * aloud. Browsers block speech until the user interacts with the page at
- * least once, so callers must invoke `unlock()` from inside a real click/tap
- * handler before the first `speak()` — see the tap-to-begin overlay.
+ * aloud. Mobile browsers (iOS Safari especially) only allow speechSynthesis
+ * to actually produce sound if the *first* speak() call happens synchronously
+ * inside a real user gesture (a click handler) — not in a useEffect that
+ * fires after the click, even a moment later. There's no separate "unlock"
+ * trick that reliably satisfies this on every browser; the caller must call
+ * speak() itself, directly, from inside the onClick.
  */
 export function useNarration({ rate = 0.9 } = {}) {
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -27,14 +30,6 @@ export function useNarration({ rate = 0.9 } = {}) {
     return () => {
       window.speechSynthesis.onvoiceschanged = null;
     };
-  }, [supported]);
-
-  // Must be called from within a user gesture to satisfy autoplay policies.
-  const unlock = useCallback(() => {
-    if (!supported) return;
-    const u = new SpeechSynthesisUtterance("");
-    window.speechSynthesis.speak(u);
-    window.speechSynthesis.cancel();
   }, [supported]);
 
   const speak = useCallback(
@@ -74,5 +69,5 @@ export function useNarration({ rate = 0.9 } = {}) {
     };
   }, [supported]);
 
-  return { speak, stop, unlock, isSpeaking, supported };
+  return { speak, stop, isSpeaking, supported };
 }
