@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import sampleBible from "../data/web-bible-sample.json";
+import storyPath from "../data/story-path.json";
 
 const STORAGE_KEY = "scripture-scroll:v1";
 
@@ -55,6 +56,37 @@ async function loadBibleData() {
   }
 }
 
+/**
+ * Builds the reading sequence from the curated story path (src/data/story-path.json)
+ * instead of raw canonical Genesis-to-Revelation order. The story path picks out the
+ * narrative arc of the Bible — creation, the patriarchs, Exodus, judges and kings,
+ * exile, the Gospels, Acts, Revelation's closing vision — and skips the genealogies,
+ * legal codes, and census lists that don't read as a story even in order.
+ *
+ * Falls back to the raw array if the story path can't be resolved against whatever
+ * Bible data is loaded (e.g. still on the small bundled sample, which only has a
+ * couple of chapters).
+ */
+function buildStorySequence(bible) {
+  const byBookChapter = new Map();
+  for (const v of bible) {
+    const key = `${v.book}|${v.chapter}`;
+    if (!byBookChapter.has(key)) byBookChapter.set(key, []);
+    byBookChapter.get(key).push(v);
+  }
+
+  const sequence = [];
+  for (const entry of storyPath) {
+    for (const chapter of entry.chapters) {
+      const verses = byBookChapter.get(`${entry.book}|${chapter}`);
+      if (!verses) continue; // chapter not present in whatever data is currently loaded
+      sequence.push(...[...verses].sort((a, b) => a.verse - b.verse));
+    }
+  }
+
+  return sequence.length > 0 ? sequence : bible;
+}
+
 export function useVerseFeed() {
   const [bible, setBible] = useState(sampleBible);
   const [state, setState] = useState(loadState);
@@ -67,8 +99,13 @@ export function useVerseFeed() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
-  const currentVerse = bible[state.index % bible.length] ?? bible[0];
-  const progressPct = useMemo(() => (state.index / Math.max(bible.length - 1, 1)) * 100, [state.index, bible.length]);
+  const sequence = useMemo(() => buildStorySequence(bible), [bible]);
+
+  const currentVerse = sequence[state.index % sequence.length] ?? sequence[0];
+  const progressPct = useMemo(
+    () => (state.index / Math.max(sequence.length - 1, 1)) * 100,
+    [state.index, sequence.length]
+  );
 
   const advance = useCallback(() => {
     setState((prev) => {
@@ -83,13 +120,13 @@ export function useVerseFeed() {
 
       return {
         ...prev,
-        index: (prev.index + 1) % bible.length,
+        index: (prev.index + 1) % sequence.length,
         streak,
         lastReadDate: today,
         versesReadToday: versesReadToday + 1
       };
     });
-  }, [bible.length]);
+  }, [sequence.length]);
 
   const toggleBookmark = useCallback((ref) => {
     setState((prev) => {
