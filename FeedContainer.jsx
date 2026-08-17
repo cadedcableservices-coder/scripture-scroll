@@ -35,10 +35,11 @@ export default function FeedContainer() {
   const [videoUrl, setVideoUrl] = useState(null);
   const [statsOpen, setStatsOpen] = useState(false);
   const [browseOpen, setBrowseOpen] = useState(false);
-  const { speak, stop, unlock, supported } = useNarration();
+  const { speak, stop, supported } = useNarration();
   const narrationOnRef = useRef(narrationOn);
   narrationOnRef.current = narrationOn;
   const touchStartY = useRef(null);
+  const skipFirstEffectRun = useRef(false);
 
   // Fetch a fresh background clip whenever the verse changes.
   useEffect(() => {
@@ -51,15 +52,19 @@ export default function FeedContainer() {
     };
   }, [currentRef]);
 
-  // The pacing loop. Only runs once the user has tapped "begin" (which also
-  // unlocks audio). Each verse: read it aloud AND wait a minimum dwell, then
+  // The pacing loop. Each verse: read it aloud AND wait a minimum dwell, then
   // advance. Using Promise.all with a floor means a silent/instant speech
   // event can never cause runaway advancing — the min dwell always applies.
-  // Manually swiping to a different verse also changes currentRef, which
-  // restarts this effect for the newly-selected verse — swipe and auto-play
-  // share the same pacing logic rather than fighting each other.
+  // The very first verse is a special case (see handleBegin below): its
+  // speak() call must happen synchronously inside the tap that starts the
+  // app, so this effect skips that one run rather than calling speak() again
+  // a moment later, which mobile browsers would silently refuse to play.
   useEffect(() => {
     if (!started) return;
+    if (skipFirstEffectRun.current) {
+      skipFirstEffectRun.current = false;
+      return;
+    }
     let cancelled = false;
 
     const minDelay = new Promise((r) => setTimeout(r, MIN_DWELL_MS));
@@ -76,10 +81,20 @@ export default function FeedContainer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentRef, started, narrationOn]);
 
+  // Starting the app. This handler runs directly inside the click event, so
+  // the FIRST speak() call here happens synchronously in a real user gesture
+  // — the one thing mobile browsers actually require to allow audio at all.
+  // (A separate "unlock with a silent utterance" trick doesn't reliably work
+  // on strict browsers, so the real narration itself has to be the unlock.)
   const handleBegin = useCallback(() => {
-    unlock(); // must happen inside this user gesture
     setStarted(true);
-  }, [unlock]);
+    skipFirstEffectRun.current = true;
+
+    const minDelay = new Promise((r) => setTimeout(r, MIN_DWELL_MS));
+    const speech = narrationOnRef.current && supported ? speak(currentVerse.text) : Promise.resolve();
+
+    Promise.all([speech, minDelay]).then(() => advance());
+  }, [speak, supported, currentVerse, advance]);
 
   const handleShare = async () => {
     const shareText = `"${currentVerse.text}" — ${currentRef} (WEB)`;
