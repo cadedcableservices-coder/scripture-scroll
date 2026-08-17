@@ -1,8 +1,19 @@
-import { Bookmark, Volume2, VolumeX, Share2 } from "lucide-react";
+import { Bookmark, Compass, Volume2, VolumeX, Share2 } from "lucide-react";
 
-export default function ActionRail({ isBookmarked, onToggleBookmark, narrationOn, onToggleNarration, onShare }) {
+export default function ActionRail({
+  isBookmarked,
+  onToggleBookmark,
+  narrationOn,
+  onToggleNarration,
+  onShare,
+  onOpenBrowse
+}) {
   return (
     <div className="absolute right-3 bottom-40 flex flex-col items-center gap-6 z-20">
+      <RailButton onClick={onOpenBrowse} label="Browse sections">
+        <Compass className="h-6 w-6" strokeWidth={1.5} color="#F3ECDA" />
+      </RailButton>
+
       <RailButton onClick={onToggleBookmark} active={isBookmarked} label="Save">
         <Bookmark
           className="h-6 w-6"
