@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Play } from "lucide-react";
 import VerseCard from "./VerseCard";
 import ProgressThread from "./ProgressThread";
@@ -6,12 +6,20 @@ import ActionRail from "./ActionRail";
 import StreakBadge from "./StreakBadge";
 import StatsSheet from "./StatsSheet";
 import BrowseSheet from "./BrowseSheet";
+import DavidGoliathScene from "./scenes/DavidGoliathScene";
 import { useNarration } from "../hooks/useNarration";
 import { useVerseFeed } from "../hooks/useVerseFeed";
 import { fetchRandomVideo } from "../hooks/useBackgroundVideo";
 
 const MIN_DWELL_MS = 6000; // never auto-advance faster than this, even if speech is silent/instant
 const SWIPE_THRESHOLD_PX = 60; // minimum vertical drag to count as a swipe, not a tap
+
+// Original hand-coded scenes, keyed by "Book|chapter". Add one entry here per
+// story as they're built — everything without an entry keeps using the
+// Pexels background video as before.
+const CUSTOM_SCENES = {
+  "1 Samuel|17": DavidGoliathScene
+};
 
 export default function FeedContainer() {
   const {
@@ -41,8 +49,13 @@ export default function FeedContainer() {
   const touchStartY = useRef(null);
   const skipFirstEffectRun = useRef(false);
 
-  // Fetch a fresh background clip whenever the verse changes.
+  const SceneComponent = CUSTOM_SCENES[`${currentVerse.book}|${currentVerse.chapter}`];
+  const scene = useMemo(() => (SceneComponent ? <SceneComponent /> : null), [SceneComponent]);
+
+  // Fetch a fresh background clip whenever the verse changes — skipped
+  // entirely when this verse has a custom hand-coded scene instead.
   useEffect(() => {
+    if (SceneComponent) return;
     let cancelled = false;
     fetchRandomVideo().then((url) => {
       if (!cancelled) setVideoUrl(url);
@@ -50,7 +63,7 @@ export default function FeedContainer() {
     return () => {
       cancelled = true;
     };
-  }, [currentRef]);
+  }, [currentRef, SceneComponent]);
 
   // The pacing loop. Each verse: read it aloud AND wait a minimum dwell, then
   // advance. Using Promise.all with a floor means a silent/instant speech
@@ -141,6 +154,7 @@ export default function FeedContainer() {
         <VerseCard
           verse={currentVerse}
           videoUrl={videoUrl}
+          scene={scene}
           onDoubleTap={() => !isBookmarked && toggleBookmark(currentRef)}
         />
       </div>
