@@ -6,7 +6,6 @@ import ActionRail from "./ActionRail";
 import StreakBadge from "./StreakBadge";
 import StatsSheet from "./StatsSheet";
 import BrowseSheet from "./BrowseSheet";
-import DavidGoliathScene from "./scenes/DavidGoliathScene";
 import { useNarration } from "../hooks/useNarration";
 import { useVerseFeed } from "../hooks/useVerseFeed";
 import { fetchRandomVideo } from "../hooks/useBackgroundVideo";
@@ -14,12 +13,11 @@ import { fetchRandomVideo } from "../hooks/useBackgroundVideo";
 const MIN_DWELL_MS = 6000; // never auto-advance faster than this, even if speech is silent/instant
 const SWIPE_THRESHOLD_PX = 60; // minimum vertical drag to count as a swipe, not a tap
 
-// Original hand-coded scenes, keyed by "Book|chapter". Add one entry here per
-// story as they're built — everything without an entry keeps using the
-// Pexels background video as before.
-const CUSTOM_SCENES = {
-  "1 Samuel|17": DavidGoliathScene
-};
+// Original hand-coded scenes, keyed by "Book|chapter". Currently empty —
+// the hand-coded SVG stick-figure approach had a real quality ceiling and
+// has been pulled while a better visual system is worked out. Everything
+// falls back to the contextual background video below.
+const CUSTOM_SCENES = {};
 
 export default function FeedContainer() {
   const {
@@ -52,12 +50,12 @@ export default function FeedContainer() {
   const SceneComponent = CUSTOM_SCENES[`${currentVerse.book}|${currentVerse.chapter}`];
   const scene = useMemo(() => (SceneComponent ? <SceneComponent /> : null), [SceneComponent]);
 
-  // Fetch a fresh background clip whenever the verse changes — skipped
-  // entirely when this verse has a custom hand-coded scene instead.
+  // Fetch a fresh, story-appropriate background clip whenever the verse
+  // changes — skipped entirely when this verse has a custom hand-coded scene.
   useEffect(() => {
     if (SceneComponent) return;
     let cancelled = false;
-    fetchRandomVideo().then((url) => {
+    fetchRandomVideo(currentVerse.book, currentVerse.chapter).then((url) => {
       if (!cancelled) setVideoUrl(url);
     });
     return () => {
