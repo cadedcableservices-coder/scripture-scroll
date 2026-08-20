@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Heart } from "lucide-react";
 
-export default function VerseCard({ verse, videoUrl, onDoubleTap }) {
+export default function VerseCard({ verse, videoUrl, scene, onDoubleTap }) {
   const [burst, setBurst] = useState(null);
   const lastTap = useRef(0);
 
@@ -23,16 +23,20 @@ export default function VerseCard({ verse, videoUrl, onDoubleTap }) {
       onClick={handleTap}
       onTouchEnd={handleTap}
     >
-      {videoUrl && (
-        <video
-          key={videoUrl}
-          src={videoUrl}
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="absolute inset-0 h-full w-full object-cover"
-        />
+      {scene ? (
+        scene
+      ) : (
+        videoUrl && (
+          <video
+            key={videoUrl}
+            src={videoUrl}
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        )
       )}
 
       {/* darken/vignette so text always stays legible over any footage */}
