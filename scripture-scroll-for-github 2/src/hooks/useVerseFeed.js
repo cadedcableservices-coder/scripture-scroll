@@ -78,13 +78,55 @@ function buildStorySequence(bible) {
   const sequence = [];
   for (const entry of storyPath) {
     for (const chapter of entry.chapters) {
-      const verses = byBookChapter.get(`${entry.book}|${chapter}`);
+      let verses = byBookChapter.get(`${entry.book}|${chapter}`);
       if (!verses) continue; // chapter not present in whatever data is currently loaded
+
+      // Some chapters mix narrative with a genealogy list (e.g. Genesis 11's
+      // Babel story followed by "Shem lived... and became the father of...",
+      // or Ruth 4's ending followed by the Perez-to-David lineage) —
+      // verseRanges lets a chapter keep only its narrative verse ranges.
+      // Each chapter maps to a list of [start, end] ranges (a chapter can
+      // need two ranges when a genealogy sits in the *middle*, like Genesis 25).
+      const ranges = entry.verseRanges?.[String(chapter)];
+      if (ranges) {
+        verses = verses.filter((v) => ranges.some(([start, end]) => v.verse >= start && v.verse <= end));
+      }
+
       sequence.push(...[...verses].sort((a, b) => a.verse - b.verse));
     }
   }
 
   return sequence.length > 0 ? sequence : bible;
+}
+
+/**
+ * Derives the "jump to a section" browse list from story-path.json entries
+ * that carry a `label` (Creation & the Fall, Abraham, the Gospel, etc.),
+ * paired with the verse-index in `sequence` where that section begins.
+ */
+function buildSections(bible) {
+  const byBookChapter = new Map();
+  for (const v of bible) {
+    const key = `${v.book}|${v.chapter}`;
+    if (!byBookChapter.has(key)) byBookChapter.set(key, []);
+    byBookChapter.get(key).push(v);
+  }
+
+  const sections = [];
+  let index = 0;
+  for (const entry of storyPath) {
+    if (entry.label) sections.push({ label: entry.label, index });
+    for (const chapter of entry.chapters) {
+      let verses = byBookChapter.get(`${entry.book}|${chapter}`);
+      if (!verses) continue;
+      const ranges = entry.verseRanges?.[String(chapter)];
+      if (ranges) {
+        verses = verses.filter((v) => ranges.some(([start, end]) => v.verse >= start && v.verse <= end));
+      }
+      index += verses.length;
+    }
+  }
+  return sections;
 }
 
 export function useVerseFeed() {
@@ -100,6 +142,7 @@ export function useVerseFeed() {
   }, [state]);
 
   const sequence = useMemo(() => buildStorySequence(bible), [bible]);
+  const sections = useMemo(() => buildSections(bible), [bible]);
 
   const currentVerse = sequence[state.index % sequence.length] ?? sequence[0];
   const progressPct = useMemo(
@@ -138,6 +181,20 @@ export function useVerseFeed() {
     });
   }, []);
 
+  // Manual navigation — swipe or the section browse menu. Unlike advance(),
+  // these don't touch streak/versesReadToday (only genuinely reading a verse
+  // through, via the auto-advance pacer, counts toward those).
+  const goToIndex = useCallback(
+    (i) => {
+      const clamped = ((i % sequence.length) + sequence.length) % sequence.length;
+      setState((prev) => ({ ...prev, index: clamped }));
+    },
+    [sequence.length]
+  );
+
+  const skipForward = useCallback(() => goToIndex(state.index + 1), [goToIndex, state.index]);
+  const skipBack = useCallback(() => goToIndex(state.index - 1), [goToIndex, state.index]);
+
   const currentRef = `${currentVerse.book} ${currentVerse.chapter}:${currentVerse.verse}`;
   const isBookmarked = state.bookmarks.includes(currentRef);
 
@@ -145,6 +202,10 @@ export function useVerseFeed() {
     currentVerse,
     currentRef,
     advance,
+    goToIndex,
+    skipForward,
+    skipBack,
+    sections,
     progressPct,
     streak: state.streak,
     versesReadToday: state.versesReadToday,
